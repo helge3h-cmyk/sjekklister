@@ -139,14 +139,14 @@ function initState() {
   SHEETS.forEach(s => {
     if (!state[s]) state[s] = {
       meta: {fabrikat:'Siemens 3AP2F1-2', driftsmerking:s, serie_nr:SERIE_NR[s]||'', prosjekt:''},
-      rows: ITEMS.map(() => ({avvik:null, maal:'', beskr:'', sign:'', dato:'', signBy:''}))
+      rows: ITEMS.map(() => ({avvik:null, maal:'', na:false, beskr:'', sign:'', dato:'', signBy:''}))
     };
     // Always fill in serie_nr if empty
     if (!state[s].meta.serie_nr && SERIE_NR[s]) {
       state[s].meta.serie_nr = SERIE_NR[s];
     }
     while (state[s].rows.length < ITEMS.length)
-      state[s].rows.push({avvik:null, maal:'', beskr:'', sign:'', dato:'', signBy:''});
+      state[s].rows.push({avvik:null, maal:'', na:false, beskr:'', sign:'', dato:'', signBy:''});
   });
 }
 
@@ -247,11 +247,21 @@ function renderSheet(n) {
     const jaOn = r.avvik==='ja' ? ' on' : '';
     const neiOn = r.avvik==='nei' ? ' on' : '';
     const signInfo = r.dato ? `<div class="dato">${r.dato}${r.signBy?' · '+r.signBy:''}</div>` : '';
+    const naChecked = r.na ? 'checked' : '';
+    const maalDisabled = r.na ? 'disabled style="background:#f0f0f0;color:#aaa"' : '';
     return `<tr class="${rc}">
       <td class="rn">${i+1}</td>
       <td style="min-width:100px;font-weight:500">${item.element}</td>
       <td style="min-width:90px;color:#666;font-size:11px">${item.metode}</td>
-      <td style="min-width:80px"><input class="ti" type="text" placeholder="Resultat" value="${esc(r.maal)}" onchange="upd(${sidx},${i},'maal',this.value)"></td>
+      <td style="min-width:100px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <input class="ti" type="text" placeholder="Resultat" value="${esc(r.maal)}" ${maalDisabled} onchange="upd(${sidx},${i},'maal',this.value)" style="flex:1">
+          <label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#888;cursor:pointer;white-space:nowrap;padding:4px 6px;border:1px solid #ddd;border-radius:4px;background:${r.na?'#f0f0f0':'#fff'}">
+            <input type="checkbox" ${naChecked} onchange="togNA(${sidx},${i},this.checked)" style="width:13px;height:13px;cursor:pointer;margin:0">
+            N/A
+          </label>
+        </div>
+      </td>
       <td style="min-width:85px"><div class="av-btns">
         <button class="av ja${jaOn}" onclick="tog(${sidx},${i},'ja')">Ja</button>
         <button class="av nei${neiOn}" onclick="tog(${sidx},${i},'nei')">Nei</button>
@@ -301,6 +311,12 @@ function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').rep
 
 function updMeta(idx,f,v){ state[SHEETS[idx]].meta[f]=v; save(); }
 function upd(idx,i,f,v){ state[SHEETS[idx]].rows[i][f]=v; save(); }
+function togNA(idx,i,val){
+  const n=SHEETS[idx];
+  state[n].rows[i].na=val;
+  if(val) state[n].rows[i].maal='';
+  save(); renderSheet(n); buildSidebar();
+}
 function tog(idx,i,v){
   const n=SHEETS[idx];
   state[n].rows[i].avvik = state[n].rows[i].avvik===v ? null : v;
@@ -354,7 +370,8 @@ function exportPDF() {
       '<td style="text-align:center;color:#aaa;width:24px">' + (i+1) + '</td>' +
       '<td style="font-weight:500">' + (item.element||'') + '</td>' +
       '<td style="color:#666">' + (item.metode||'') + '</td>' +
-      '<td>' + (r.maal||'') + '</td>' +
+      '<td>' + (r.na ? '<i>N/A</i>' : (r.maal||'')) + '</td>' +
+      '<td style="text-align:center">' + (r.na ? '✓' : '') + '</td>' +
       '<td style="text-align:center;font-weight:600">' + avvik + '</td>' +
       '<td>' + (r.beskr||'') + '</td>' +
       '<td style="font-weight:500">' + (r.sign||'') + '</td>' +
@@ -387,7 +404,7 @@ function exportPDF() {
     '<div class="mf"><label>Prosjekt</label><span>' + (s.meta.prosjekt||'—') + '</span></div>' +
     '</div>' +
     '<div class="prog"><b>' + st.pct + '%</b><div class="track"><div class="fill" style="width:' + st.pct + '%"></div></div><span style="color:#888">' + st.sg + '/' + st.tot + ' signert</span></div>' +
-    '<table><thead><tr><th>#</th><th>Element</th><th>Metode</th><th>Målt resultat</th><th>Avvik</th><th>Beskrivelse</th><th>Signatur</th><th>Dato</th></tr></thead>' +
+    '<table><thead><tr><th>#</th><th>Element</th><th>Metode</th><th>Målt resultat</th><th>N/A</th><th>Avvik</th><th>Beskrivelse</th><th>Signatur</th><th>Dato</th></tr></thead>' +
     '<tbody>' + rows + '</tbody></table>' +
     '<p style="margin-top:12px;font-size:9px;color:#aaa">Generert: ' + new Date().toLocaleString("no-NO") + '</p>' +
     '<script>window.onload=function(){window.print()}<\/script>' +

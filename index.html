@@ -139,14 +139,14 @@ function initState() {
   SHEETS.forEach(s => {
     if (!state[s]) state[s] = {
       meta: {fabrikat:'Siemens 3AP2F1-2', driftsmerking:s, serie_nr:SERIE_NR[s]||'', prosjekt:''},
-      rows: ITEMS.map(() => ({avvik:null, maal:'', na:false, beskr:'', sign:'', dato:'', signBy:''}))
+      rows: ITEMS.map(() => ({avvik:null, maal:'', na:false, beskr:'', sign:'', dato:'', signBy:'', changelog:[]}))
     };
     // Always fill in serie_nr if empty
     if (!state[s].meta.serie_nr && SERIE_NR[s]) {
       state[s].meta.serie_nr = SERIE_NR[s];
     }
     while (state[s].rows.length < ITEMS.length)
-      state[s].rows.push({avvik:null, maal:'', na:false, beskr:'', sign:'', dato:'', signBy:''});
+      state[s].rows.push({avvik:null, maal:'', na:false, beskr:'', sign:'', dato:'', signBy:'', changelog:[]});
   });
 }
 
@@ -304,8 +304,50 @@ function renderSheet(n) {
         <thead><tr><th>#</th><th>Element</th><th>Metode</th><th>Målt resultat</th><th>Avvik</th><th>Beskrivelse</th><th>Signatur</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
-    </div>`;
+    </div>
+    ${buildChangelog(n)}`;
 }
+function buildChangelog(n) {
+  const hasLog = state[n].rows.some(r => r.changelog && r.changelog.length > 0);
+  if (!hasLog) return '';
+  let rows = '';
+  state[n].rows.forEach((r, i) => {
+    if (r.changelog && r.changelog.length > 0) {
+      r.changelog.forEach(log => {
+        const fraColor = log.fra === 'ja' ? '#ffe0e0' : log.fra === 'nei' ? '#dcfce7' : '#f0f0f0';
+        const tilColor = log.til === 'ja' ? '#ffe0e0' : log.til === 'nei' ? '#dcfce7' : '#f0f0f0';
+        rows += '<tr style="border-bottom:1px solid #f0f0f0">' +
+          '<td style="padding:6px 8px;color:#aaa;font-size:10px;text-align:center">' + (i+1) + '</td>' +
+          '<td style="padding:6px 8px;font-weight:500;font-size:12px">' + ITEMS[i].element + '</td>' +
+          '<td style="padding:6px 8px;font-size:11px;color:#666">' + ITEMS[i].metode + '</td>' +
+          '<td style="padding:6px 8px;text-align:center"><span style="background:' + fraColor + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500">' + (log.fra||'—') + '</span></td>' +
+          '<td style="padding:6px 8px;text-align:center;color:#888">→</td>' +
+          '<td style="padding:6px 8px;text-align:center"><span style="background:' + tilColor + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500">' + log.til + '</span></td>' +
+          '<td style="padding:6px 8px;font-size:12px">' + log.kommentar + '</td>' +
+          '<td style="padding:6px 8px;font-size:11px;font-weight:500">' + log.sign + '</td>' +
+          '<td style="padding:6px 8px;font-size:10px;color:#888;white-space:nowrap">' + log.tid + '</td>' +
+        '</tr>';
+      });
+    }
+  });
+  if (!rows) return '';
+  return '<div style="margin-top:20px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">' +
+    '<div style="padding:12px 16px;font-weight:600;font-size:13px;border-bottom:1px solid #eee;background:#f8f8f8;color:#1a2744">&#9998; Changelog — Endringslogg</div>' +
+    '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+    '<thead><tr style="background:#f8f8f8">' +
+    '<th style="padding:7px 8px;text-align:center;font-size:10px;text-transform:uppercase;color:#888;border-bottom:1px solid #eee">#</th>' +
+    '<th style="padding:7px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#888;border-bottom:1px solid #eee">Element</th>' +
+    '<th style="padding:7px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#888;border-bottom:1px solid #eee">Metode</th>' +
+    '<th style="padding:7px 8px;text-align:center;font-size:10px;text-transform:uppercase;color:#888;border-bottom:1px solid #eee">Fra</th>' +
+    '<th style="padding:7px 8px;border-bottom:1px solid #eee"></th>' +
+    '<th style="padding:7px 8px;text-align:center;font-size:10px;text-transform:uppercase;color:#888;border-bottom:1px solid #eee">Til</th>' +
+    '<th style="padding:7px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#888;border-bottom:1px solid #eee">Kommentar</th>' +
+    '<th style="padding:7px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#888;border-bottom:1px solid #eee">Signert av</th>' +
+    '<th style="padding:7px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:#888;border-bottom:1px solid #eee">Tidspunkt</th>' +
+    '</tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div></div>';
+}
+
 
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
@@ -319,8 +361,86 @@ function togNA(idx,i,val){
 }
 function tog(idx,i,v){
   const n=SHEETS[idx];
+  const prev = state[n].rows[i].avvik;
+  // If changing from 'ja' to 'nei', require changelog comment
+  if (prev === 'ja' && v === 'nei') {
+    showChangelogDialog(idx, i, v);
+    return;
+  }
   state[n].rows[i].avvik = state[n].rows[i].avvik===v ? null : v;
   save(); renderSheet(n); buildSidebar();
+}
+
+function showChangelogDialog(idx, i, newVal) {
+  // Store pending change globally
+  window._pendingChange = {idx, i, newVal};
+  const item = ITEMS[i];
+  const n = SHEETS[idx];
+  const prev = state[n].rows[i].avvik;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cl-modal';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px';
+
+  const fraLabel = prev === 'ja' ? 'Ja' : prev === 'nei' ? 'Nei' : '—';
+  const tilLabel = newVal === 'ja' ? 'Ja' : 'Nei';
+  const now = new Date().toLocaleString('no-NO');
+
+  overlay.innerHTML = 
+    '<div style="background:#fff;border-radius:10px;padding:24px;max-width:480px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.2)">' +
+    '<h3 style="font-size:15px;font-weight:600;color:#1a2744;margin-bottom:4px">Endre avvik</h3>' +
+    '<p style="font-size:12px;color:#888;margin-bottom:12px">' + item.element + ' — ' + item.metode + '</p>' +
+    '<p style="font-size:12px;color:#666;margin-bottom:12px">Endring: <b>' + fraLabel + '</b> → <b>' + tilLabel + '</b></p>' +
+    '<label style="font-size:10px;font-weight:600;text-transform:uppercase;color:#888;display:block;margin-bottom:4px">Kommentar (påkrevd)</label>' +
+    '<textarea id="cl-comment" placeholder="Begrunn endringen..." style="width:100%;height:80px;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;margin-bottom:12px;display:block"></textarea>' +
+    '<label style="font-size:10px;font-weight:600;text-transform:uppercase;color:#888;display:block;margin-bottom:4px">Signatur (påkrevd)</label>' +
+    '<input id="cl-sign" type="text" placeholder="Ditt navn" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:6px;display:block">' +
+    '<div style="font-size:10px;color:#aaa;margin-bottom:16px">' + now + '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+    '<button onclick="closeChangelogDialog()" style="padding:8px 16px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:13px;cursor:pointer">Avbryt</button>' +
+    '<button onclick="confirmChangelog()" style="padding:8px 16px;border:none;border-radius:6px;background:#2d5be3;color:#fff;font-size:13px;font-weight:500;cursor:pointer">Bekreft endring</button>' +
+    '</div></div>';
+
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('cl-comment').focus(), 100);
+}
+
+function closeChangelogDialog() {
+  const el = document.getElementById('cl-modal');
+  if (el) el.remove();
+}
+
+function confirmChangelog() {
+  const {idx, i, newVal} = window._pendingChange || {};
+  if (idx === undefined) return;
+  const comment = document.getElementById('cl-comment').value.trim();
+  const sign = document.getElementById('cl-sign').value.trim();
+  if (!comment) { 
+    document.getElementById('cl-comment').style.borderColor = '#e74c3c';
+    document.getElementById('cl-comment').placeholder = 'Kommentar er påkrevd!';
+    return; 
+  }
+  if (!sign) {
+    document.getElementById('cl-sign').style.borderColor = '#e74c3c';
+    document.getElementById('cl-sign').placeholder = 'Signatur er påkrevd!';
+    return;
+  }
+  const n = SHEETS[idx];
+  const prev = state[n].rows[i].avvik;
+  if (!state[n].rows[i].changelog) state[n].rows[i].changelog = [];
+  state[n].rows[i].changelog.push({
+    fra: prev,
+    til: newVal,
+    kommentar: comment,
+    sign: sign,
+    tid: new Date().toLocaleString('no-NO')
+  });
+  state[n].rows[i].avvik = newVal;
+  closeChangelogDialog();
+  save();
+  renderSheet(n);
+  buildSidebar();
+  toast('Endring registrert i changelog');
 }
 function sign_(idx,i,v){ const n=SHEETS[idx];
   state[n].rows[i].sign=v;

@@ -156,10 +156,12 @@ function initState() {
 function getStats(n) {
   const s = state[n];
   const tot = ITEMS.length;
-  const av = s.rows.filter(r => r.avvik !== null).length;
-  const sg = s.rows.filter(r => r.sign && r.sign.trim()).length;
+  // N/A rader telles som fullført (trenger ikke avvik eller signatur)
+  const av = s.rows.filter(r => r.na || r.avvik !== null).length;
+  const sg = s.rows.filter(r => r.na || (r.sign && r.sign.trim())).length;
   const done = av === tot && sg === tot;
-  return {tot, av, sg, done, pct: Math.round((sg/tot)*100)};
+  const pct = Math.round((sg/tot)*100);
+  return {tot, av, sg, done, pct};
 }
 
 function getOverall() {

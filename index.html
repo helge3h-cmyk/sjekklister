@@ -237,6 +237,20 @@ table.ct tr.r-na .av-btns{pointer-events:none;opacity:.4}
   padding:2px 7px;font-size:11px;font-weight:600;margin-left:4px;
 }
 .presence-dot { width:6px;height:6px;border-radius:50%;background:#4ade80;display:inline-block; }
+
+/* ── BILDER ── */
+.img-section { margin-top:20px; padding:16px; background:#f9fafb; border-radius:12px; border:1px solid #e5e7eb; }
+.img-section h3 { font-size:13px; font-weight:700; color:#1a2744; margin:0 0 12px; text-transform:uppercase; letter-spacing:.5px; }
+.img-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-bottom:12px; }
+.img-thumb { position:relative; aspect-ratio:1; border-radius:8px; overflow:hidden; background:#e5e7eb; cursor:pointer; }
+.img-thumb img { width:100%; height:100%; object-fit:cover; }
+.img-thumb .img-del { position:absolute; top:4px; right:4px; background:rgba(0,0,0,.55); color:#fff; border:none; border-radius:50%; width:22px; height:22px; font-size:13px; cursor:pointer; display:none; align-items:center; justify-content:center; }
+.img-thumb:hover .img-del { display:flex; }
+.img-upload-btn { display:flex; align-items:center; gap:6px; padding:8px 14px; background:#1a2744; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; }
+.img-upload-btn:disabled { opacity:.5; cursor:default; }
+.img-lightbox { position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:9999; display:flex; align-items:center; justify-content:center; }
+.img-lightbox img { max-width:90vw; max-height:90vh; border-radius:8px; box-shadow:0 8px 40px rgba(0,0,0,.5); }
+.img-lightbox-close { position:absolute; top:20px; right:24px; color:#fff; font-size:32px; cursor:pointer; background:none; border:none; }
 </style>
 </head>
 <body>
@@ -912,7 +926,7 @@ function renderSheet(mcid,sheetName){
       <td style="min-width:100px"><textarea class="ti" placeholder="Beskrivelse" data-mcid="${mcid}" data-sn="${sheetName}" data-idx="${i}" data-field="beskr" oninput="autoResize(this);handleTaChange(this)" style="resize:none;overflow:hidden;min-height:28px;line-height:1.4;padding:4px 6px;font-family:inherit">${esc(r.beskr||"")}</textarea></td>
       <td style="min-width:90px"><div class="sign-w">
         ${r.sign
-          ? `<div style="font-size:12px;font-weight:600;color:#2d7a4f;padding:4px 0">${esc(r.sign)}</div>${signInfo}`
+          ? `<div style="font-size:12px;font-weight:600;color:#2d7a4f;padding:4px 0">${esc(r.sign)}${window.currentUser?.id==='helge'?` <button onclick="removeSign('${mcid}','${sheetName.replace(/'/g,"\\'")}',${i})" title="Fjern signatur" style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:13px;padding:0 2px;vertical-align:middle">✕</button>`:''}</div>${signInfo}`
           : `<button onclick="signRow('${mcid}','${sheetName.replace(/'/g,"\\'")}',${i})" style="background:#1a2744;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer">Signer</button>`
         }
       </div></td>
@@ -955,7 +969,19 @@ function renderSheet(mcid,sheetName){
       </table>
     </div>
     ${buildChangelog(mcid,sheetName)}
+    <div class="img-section">
+      <h3>📷 Bilder</h3>
+      <div class="img-grid" id="img-grid-${mcid}-${sheetName.replace(/[^a-zA-Z0-9]/g,'-')}">
+        <div style="color:#aaa;font-size:13px;grid-column:1/-1" id="img-loading-${mcid}-${sheetName.replace(/[^a-zA-Z0-9]/g,'-')}">Laster bilder...</div>
+      </div>
+      <button class="img-upload-btn" onclick="triggerImageUpload('${mcid}','${sheetName.replace(/'/g,"\\'")}')">
+        📎 Last opp bilde
+      </button>
+      <input type="file" id="img-input-${mcid}-${sheetName.replace(/[^a-zA-Z0-9]/g,'-')}" accept="image/*" multiple style="display:none" onchange="uploadImages(this,'${mcid}','${sheetName.replace(/'/g,"\\'")}')">
+    </div>
   </div>`;
+  // Load images after render
+  setTimeout(() => loadImages('${mcid}','${sheetName}'), 50);
 }
 
 // ── CHANGELOG ──
@@ -1018,6 +1044,16 @@ function togNA(mcid,sn,i,val){
   if(val) state[mcid].sheets[sn].rows[i].maal='';
   save(); renderSheet(mcid,sn); buildSidebar();
 }
+function removeSign(mcid,sn,i){
+  if(window.currentUser?.id !== 'helge') return;
+  if(!confirm('Fjerne signaturen?')) return;
+  if(!state[mcid]?.sheets[sn]) return;
+  state[mcid].sheets[sn].rows[i].sign = '';
+  state[mcid].sheets[sn].rows[i].dato = '';
+  state[mcid].sheets[sn].rows[i].signBy = '';
+  save(); renderSheet(mcid,sn); buildSidebar();
+}
+
 function signRow(mcid,sn,i){
   if(!state[mcid]?.sheets[sn]) return;
   const user = window.currentUser;
@@ -1153,6 +1189,113 @@ function toast(m){
   setTimeout(()=>t.classList.remove('show'),3000);
 }
 
+
+
+// ── BILDER ──
+function imgGridId(mcid, sn) {
+  return 'img-grid-' + mcid + '-' + sn.replace(/[^a-zA-Z0-9]/g,'-');
+}
+
+async function loadImages(mcid, sn) {
+  const gridId = imgGridId(mcid, sn);
+  const grid = document.getElementById(gridId);
+  if (!grid) return;
+
+  try {
+    const key = encodeURIComponent(mcid + '/' + sn);
+    const res = await fetch(WORKER + '/imagelist/' + mcid + '/' + encodeURIComponent(sn));
+    const images = await res.json();
+
+    if (!Array.isArray(images) || images.length === 0) {
+      grid.innerHTML = '<div style="color:#aaa;font-size:13px;grid-column:1/-1">Ingen bilder lastet opp</div>';
+      return;
+    }
+
+    grid.innerHTML = images.map(img => `
+      <div class="img-thumb" onclick="openLightbox('${img.url}')">
+        <img src="${img.url}" alt="bilde" loading="lazy">
+        ${window.currentUser?.id === 'helge' ? `<button class="img-del" onclick="event.stopPropagation();deleteImage('${img.key}','${mcid}','${sn}')">✕</button>` : ''}
+      </div>`).join('');
+  } catch(e) {
+    grid.innerHTML = '<div style="color:#c0392b;font-size:13px;grid-column:1/-1">Kunne ikke laste bilder</div>';
+  }
+}
+
+function triggerImageUpload(mcid, sn) {
+  const inputId = 'img-input-' + mcid + '-' + sn.replace(/[^a-zA-Z0-9]/g,'-');
+  document.getElementById(inputId)?.click();
+}
+
+async function uploadImages(input, mcid, sn) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+
+  const btn = input.previousElementSibling;
+  btn.disabled = true;
+  btn.textContent = 'Laster opp...';
+
+  for (const file of files) {
+    if (file.size > 10 * 1024 * 1024) {
+      alert(file.name + ' er for stor (maks 10 MB)');
+      continue;
+    }
+    // Compress image before upload
+    const compressed = await compressImage(file, 1200, 0.8);
+    const key = mcid + '/' + sn + '/' + Date.now() + '-' + file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    try {
+      await fetch(WORKER + '/images/' + encodeURIComponent(key), {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'image/jpeg' },
+        body: compressed
+      });
+    } catch(e) {
+      alert('Feil ved opplasting av ' + file.name);
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = '📎 Last opp bilde';
+  input.value = '';
+  await loadImages(mcid, sn);
+}
+
+function compressImage(file, maxPx, quality) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.width, h = img.height;
+      if (w > maxPx || h > maxPx) {
+        if (w > h) { h = Math.round(h * maxPx / w); w = maxPx; }
+        else { w = Math.round(w * maxPx / h); h = maxPx; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => resolve(blob), 'image/jpeg', quality);
+    };
+    img.src = url;
+  });
+}
+
+async function deleteImage(key, mcid, sn) {
+  if (!confirm('Slette dette bildet?')) return;
+  try {
+    await fetch(WORKER + '/images/' + encodeURIComponent(key), { method: 'DELETE' });
+    await loadImages(mcid, sn);
+  } catch(e) {
+    alert('Kunne ikke slette bildet');
+  }
+}
+
+function openLightbox(url) {
+  const lb = document.createElement('div');
+  lb.className = 'img-lightbox';
+  lb.innerHTML = `<button class="img-lightbox-close" onclick="this.parentElement.remove()">×</button><img src="${url}">`;
+  lb.addEventListener('click', e => { if(e.target === lb) lb.remove(); });
+  document.body.appendChild(lb);
+}
 
 // ── INNLOGGING ──
 const USERS = [

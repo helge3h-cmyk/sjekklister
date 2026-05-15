@@ -532,7 +532,7 @@ function toggleGroup(kat){
 }
 function buildSidebar(q){
   q=(q||'').toLowerCase();
-  const groups={'420kV':'420 kV','132kV':'132 kV','Felles':'Felles'};
+  const groups={'Felles':'Sjekklister','420kV':'MC Sjekklister — 420 kV','132kV':'MC Sjekklister — 132 kV'};
   const groupColors={'420kV':'kv420','132kV':'kv132','Felles':'felles'};
   let html='';
   Object.keys(groups).forEach(kat=>{
@@ -555,9 +555,12 @@ function buildSidebar(q){
         <span class="s-mc-name">${cfg.navn}</span>${badge}
       </div>`;
     });
-    // Add Changelog link only for Felles group
+    // Add RIR and Changelog links only for Felles group
     if(kat==='Felles'){
-      html+=`<div class="s-mc${currentMC==='__changelog__'?' active':''}" onclick="showChangelog()" style="border-top:1px solid #e8e8e8;margin-top:4px">
+      html+=`<div class="s-mc${currentMC==='__rir__'?' active':''}" onclick="showRIR()" style="border-top:1px solid #e8e8e8;margin-top:4px">
+        <span class="s-mc-name" style="color:#1a6b3a">📦 Mottakskontroll (RIR)</span>
+      </div>`;
+      html+=`<div class="s-mc${currentMC==='__changelog__'?' active':''}" onclick="showChangelog()" style="border-top:1px solid #e8e8e8;margin-top:2px">
         <span class="s-mc-name" style="color:#5a4a8a">📋 Versjonshistorikk</span>
       </div>`;
     }
@@ -569,12 +572,509 @@ function buildSidebar(q){
 function filterSidebar(q){buildSidebar(q);}
 
 // ── HOME DASHBOARD ──
+
+// ── MOTTAKSKONTROLL (RIR) ──
+const RIR_LOG = [
+  {id:'ID 01', beskrivelse:'C10-1425 Bottom Insulators - Reception Inspection Report', dato:'20250623'},
+  {id:'ID 02', beskrivelse:'C10-1425 Top Insulators - Reception Inspection Report', dato:'20250623'},
+  {id:'ID 03', beskrivelse:'C8-650 34513A Insulators - Reception Inspection Report', dato:'20250623'},
+  {id:'ID 04', beskrivelse:'RIR - Disconnectors 420kV - Truck 1', dato:'20251001'},
+  {id:'ID 05', beskrivelse:'RIR - Disconnectors 420kV - Truck 2', dato:'20251001'},
+  {id:'ID 06', beskrivelse:'RIR - Disconnectors 420kV - Truck 3', dato:'20251001'},
+  {id:'ID 06.1', beskrivelse:'RIR - Effektbrytere 420kV - Bil 1', dato:'20251014'},
+  {id:'ID 06.2', beskrivelse:'RIR - Effektbrytere 420kV - Bil 2', dato:'20251015'},
+  {id:'ID 07', beskrivelse:'RIR - BIL1 - 132kV Gantries + Transformer Gantry + Reactor', dato:'20251029'},
+  {id:'ID 08', beskrivelse:'RIR - BIL2 - 132kV Gantries + Transformer Gantry + Reactor', dato:'20251029'},
+  {id:'ID 09', beskrivelse:'RIR - BIL3 - 132kV Gantries + Transformer Gantry + Reactor', dato:'20251111'},
+  {id:'ID 10', beskrivelse:'RIR - BIL1 - Apparatstål 132kV', dato:'20251118'},
+  {id:'ID 11', beskrivelse:'RIR - BIL2 - Apparatstål 132kV', dato:'20251120'},
+  {id:'ID 12', beskrivelse:'RIR - BIL1 - 420 & CB stål', dato:'20251203'},
+  {id:'ID 13', beskrivelse:'RIR - BIL2 - 420 & CB stål', dato:'20251203'},
+  {id:'ID 14', beskrivelse:'RIR - BIL3 - 420 & CB stål', dato:'20251204'},
+  {id:'ID 15', beskrivelse:'RIR - BIL4 - 420 & CB stål', dato:'20251205'},
+  {id:'ID 16', beskrivelse:'RIR - BIL1 - Arteche', dato:'20251216'},
+  {id:'ID 17', beskrivelse:'RIR - BIL2 - Arteche', dato:'20251216'},
+  {id:'ID 18', beskrivelse:'RIR - BIL3 - Arteche', dato:'20251216'},
+  {id:'ID 18.01', beskrivelse:'RIR - Bardun 095mm2', dato:'20251126'},
+  {id:'ID 19', beskrivelse:'RIR - BIL5 - 420 & CB stål', dato:'20251215'},
+  {id:'ID 20', beskrivelse:'RIR - BIL6 - 420 & CB stål', dato:'20251216'},
+  {id:'ID 21', beskrivelse:'RIR - BIL7 - 420 & CB stål', dato:'20251217'},
+  {id:'ID 22', beskrivelse:'RIR - BIL4 - Arteche', dato:'20260106'},
+  {id:'ID 23', beskrivelse:'RIR - BIL5 - Arteche', dato:'20260106'},
+  {id:'ID 24', beskrivelse:'RIR - Shims', dato:'20260112'},
+  {id:'ID 25', beskrivelse:'RIR - BIL1 - Effektbrytere 132kV Hitachi', dato:'20260115'},
+  {id:'ID 26', beskrivelse:'RIR - BIL2 - Effektbrytere 132kV Hitachi', dato:'20260119'},
+  {id:'ID 27', beskrivelse:'RIR - BIL1 - 420kV Low structures', dato:'20260127'},
+  {id:'ID 28', beskrivelse:'RIR - BIL2 - 420kV Low structures', dato:'20260127'},
+  {id:'ID 29', beskrivelse:'RIR - BIL3 - Effektbrytere 132kV Hitachi', dato:'20260128'},
+  {id:'ID 30', beskrivelse:'RIR - Bil 1 - ALU lina', dato:'20260129'},
+  {id:'ID 31', beskrivelse:'RIR - Bil 2 - ALU lina', dato:'20260129'},
+  {id:'ID 32', beskrivelse:'RIR - Bil 3 - Effektbrytere 420kV', dato:'20260202'},
+  {id:'ID 33', beskrivelse:'RIR - Bil 4 - Effektbrytere 420kV', dato:'20260203'},
+  {id:'ID 34', beskrivelse:'RIR - Bil 5 - Effektbrytere 420kV', dato:'20260203'},
+  {id:'ID 35', beskrivelse:'RIR - Bil 6 - Effektbrytere 420kV', dato:'20260203'},
+  {id:'ID 36', beskrivelse:'RIR - Bil 7 - Effektbrytere 420kV', dato:'20260203'},
+  {id:'ID 37', beskrivelse:'RIR - BIL3 - Apparatstål 420kV', dato:'20260204'},
+  {id:'ID 38', beskrivelse:'RIR - Bil 8 - Effektbrytere 420kV', dato:'20260204'},
+  {id:'ID 39', beskrivelse:'RIR - Bil 9 - Effektbrytere 420kV', dato:'20260204'},
+  {id:'ID 40', beskrivelse:'RIR - HV Clamps Bil 1', dato:'20260217'},
+  {id:'ID 41', beskrivelse:'RIR - Åskmast extension', dato:'20260217'},
+  {id:'ID 42', beskrivelse:'RIR - HV Clamps Bil 2', dato:'20260223'},
+  {id:'ID 43', beskrivelse:'RIR - Stasjonstrafo', dato:'20260305'},
+  {id:'ID 44', beskrivelse:'RIR - Jord lanser', dato:'20260310'},
+  {id:'ID 45', beskrivelse:'RIR - Avledare PexlimQ182', dato:'20260316'},
+  {id:'ID 46', beskrivelse:'RIR - HV Clamps Bil 3', dato:'20260323'},
+  {id:'ID 47', beskrivelse:'RIR - Disconnectors 132', dato:'20260413'},
+  {id:'ID 48', beskrivelse:'RIR - BIL1 - Extension stål', dato:'20260504'},
+  {id:'ID 49', beskrivelse:'RIR - ALU Pipes (Nedal Aluminium BV)', dato:'20251110'},
+];
+
+// RIR state stored in cloud state
+
+// ── FORHÅNDSUTFYLTE RIR-DATA (fra PDF-er) ──
+const RIR_PREFILL = {
+  'ID 18.01': {
+    reportnr: '18',
+    dato: '2025-11-26',
+    receiver: 'Patrik Gustavsson',
+    project: 'NKF-1005 Skyberg',
+    customer: 'Statnett',
+    supplier: 'ER Elektro AS',
+    origin: 'Nederlandene',
+    packref: '',
+    weight: '',
+    pakking: ['Other'],
+    comments: 'Bardun 095mm2 2+4, L=9400mm. Fra Fremo AS via ER Elektro.',
+    status: { 'Pictures Taken': 'yes', 'Open': 'no', 'Broken': 'no', 'Smashed': 'no', 'Deformed': 'no', 'Soaked/Wet': 'no', 'Rusty/Corroded': 'no' },
+    resultat: 'OK',
+    signert: 'Patrik Gustavsson',
+    lagretDato: '26.11.2025',
+  },
+  'ID 41': {
+    reportnr: '41',
+    dato: '2026-02-18',
+    receiver: 'Patrik Gustavsson',
+    project: 'NKF-1005 Skyberg',
+    customer: 'Statnett',
+    supplier: 'Elteco AS',
+    origin: 'Norge',
+    packref: '',
+    weight: '600',
+    pakking: ['Other'],
+    comments: 'Wood beams. Åskmast extension. Fraktbrev ref. 349300.',
+    status: { 'Pictures Taken': 'yes', 'Open': 'no', 'Broken': 'no', 'Smashed': 'no', 'Deformed': 'no', 'Soaked/Wet': 'no', 'Rusty/Corroded': 'no' },
+    resultat: 'OK',
+    signert: 'Patrik Gustavsson',
+    lagretDato: '18.02.2026',
+  },
+  'ID 45': {
+    reportnr: '45',
+    dato: '2026-03-16',
+    receiver: 'Patrik Gustavsson',
+    project: 'NKF-1005 Skyberg',
+    customer: 'Statnett',
+    supplier: 'Hitachi Energy Sweden AB',
+    origin: 'Sverige',
+    packref: 'NO-1676-P-100098891 / NO-1676-P-100098892',
+    weight: '750',
+    pakking: ['Pallet', 'Metal/Plastic Container'],
+    comments: 'PEXLIM Q182-YV145E, 12 stk. Serial SA030073–SA030084. Sales Order 890180534. Alle bestått rutinetest iht. IEC 60099-4.',
+    status: { 'Pictures Taken': 'yes', 'Open': 'no', 'Broken': 'no', 'Smashed': 'no', 'Deformed': 'no', 'Soaked/Wet': 'no', 'Rusty/Corroded': 'no' },
+    resultat: 'OK',
+    signert: 'Patrik Gustavsson',
+    lagretDato: '16.03.2026',
+  },
+  'ID 18': {
+    reportnr: '18',
+    dato: '2025-12-16',
+    receiver: 'Patrik Gustavsson',
+    project: 'NKF-1005 Skyberg',
+    customer: 'Statnett',
+    ponr: '10029791',
+    supplier: 'Arteche',
+    origin: 'Spain',
+    packref: '',
+    weight: '',
+    pakking: ['Wood box'],
+    comments: 'Lastbil 3/5',
+    status: { 'Pictures Taken': 'yes', 'Open': 'no', 'Broken': 'no', 'Smashed': 'no', 'Deformed': 'no', 'Soaked/Wet': 'no', 'Rusty/Corroded': 'no' },
+    resultat: 'OK',
+    signert: 'Patrik Gustavsson',
+    lagretDato: '16.12.2025',
+  },
+  'ID 49': {
+    reportnr: '',
+    dato: '2025-11-10',
+    receiver: 'Patrik Gustavsson',
+    project: 'NKF-1005 Skyberg',
+    customer: 'Statnett',
+    ponr: '30276I',
+    supplier: 'ER Elektro AS (Nedal Aluminium BV)',
+    origin: 'Nederlandene',
+    packref: 'Booking ref. 17610633',
+    weight: '15089',
+    pakking: ['Other'],
+    comments: 'ALU Pipes. 26 stk aluminiumsrør, 21m. 250x10mm og 160x6mm. Buntat och lastat på träbitar.',
+    status: { 'Pictures Taken': 'yes', 'Open': 'no', 'Broken': 'no', 'Smashed': 'no', 'Deformed': 'no', 'Soaked/Wet': 'no', 'Rusty/Corroded': 'no' },
+    resultat: 'OK',
+    signert: 'Patrik Gustavsson',
+    lagretDato: '11.11.2025',
+  },
+
+  // Batch 2 - fra nye PDF-er
+  'ID 01': {
+    reportnr: '1',
+    dato: '2025-06-23',
+    receiver: 'Espen Vestrum, Oppland Elektro',
+    project: 'NKF-1005 Skyberg',
+    customer: 'Statnett',
+    ponr: '404530',
+    supplier: 'EB Elektro',
+    origin: 'Shanghai, China',
+    packref: 'C10-1425 Grey Bottom, 35819. 8 pallets - 72 insulators.',
+    weight: '12288',
+    pakking: ['Pallet', 'Metal/Plastic Container'],
+    comments: 'Utfordrende å losse containere da disse er pakket med truck som går inn i container. Pallene er for små for å kunne bruke vanlig jekketralle inne i container. Lastebilen måtte kjøre bort på Schenker sitt lager for å få hjelp med å laste om inne i container. Som resultat tok lossingen mye lengre tid enn forventet. Estimert 4-5 timer ekstra.',
+    status: { 'Pictures Taken': 'yes', 'Open': 'no', 'Broken': 'no', 'Smashed': 'no', 'Deformed': 'no', 'Soaked/Wet': 'no', 'Rusty/Corroded': 'no', 'Water tight': 'no', 'Sealed': 'no' },
+    resultat: 'OK',
+    signert: 'Espen Vestrum',
+    lagretDato: '23.06.2025',
+  },
+  'ID 02': {
+    reportnr: '2',
+    dato: '2025-06-23',
+    receiver: 'Espen Vestrum, Oppland Elektro',
+    project: 'NKF-1005 Skyberg',
+    customer: 'Statnett',
+    ponr: '404530',
+    supplier: 'EB Elektro',
+    origin: 'Shanghai, China',
+    packref: 'C10-1425 Grey Top, 35819. 8 pallets - 72 insulators.',
+    weight: '11216',
+    pakking: ['Pallet', 'Metal/Plastic Container'],
+    comments: 'Utfordrende å losse containere da disse er pakket med truck som går inn i container. Pallene er for små for å kunne bruke vanlig jekketralle inne i container. Lastebilen måtte kjøre bort på Schenker sitt lager for å få hjelp med å laste om inne i container. Som resultat tok lossingen mye lengre tid enn forventet. Estimert 4-5 timer ekstra.',
+    status: { 'Pictures Taken': 'yes', 'Open': 'no', 'Broken': 'no', 'Smashed': 'no', 'Deformed': 'no', 'Soaked/Wet': 'no', 'Rusty/Corroded': 'no', 'Water tight': 'no', 'Sealed': 'no' },
+    resultat: 'OK',
+    signert: 'Espen Vestrum',
+    lagretDato: '23.06.2025',
+  },
+  'ID 03': {
+    reportnr: '3',
+    dato: '2025-06-23',
+    receiver: 'Espen Vestrum, Oppland Elektro',
+    project: 'NKF-1005 Skyberg',
+    customer: 'Statnett',
+    ponr: '404530',
+    supplier: 'EB Elektro',
+    origin: 'Shanghai, China',
+    packref: 'C8-650 34513A. 7 pallets - 67 insulators.',
+    weight: '11216',
+    pakking: ['Pallet', 'Metal/Plastic Container'],
+    comments: 'Utfordrende å losse containere da disse er pakket med truck som går inn i container. Pallene er for små for å kunne bruke vanlig jekketralle inne i container. Lastebilen måtte kjøre bort på Schenker sitt lager for å få hjelp med å laste om inne i container. Som resultat tok lossingen mye lengre tid enn forventet. Estimert 4-5 timer ekstra.',
+    status: { 'Pictures Taken': 'yes', 'Open': 'no', 'Broken': 'no', 'Smashed': 'no', 'Deformed': 'no', 'Soaked/Wet': 'no', 'Rusty/Corroded': 'no', 'Water tight': 'no', 'Sealed': 'no' },
+    resultat: 'OK',
+    signert: 'Espen Vestrum',
+    lagretDato: '23.06.2025',
+  },
+  'ID 24': {
+    reportnr: '24',
+    dato: '2026-01-12',
+    receiver: 'Patrik Gustavsson',
+    project: 'NKF-1005 Skyberg',
+    customer: 'Statnett',
+    supplier: 'PG Flow Solutions AS',
+    origin: 'Norge',
+    packref: 'PG Nr. 202514186 / 202514628',
+    weight: '',
+    pakking: ['Pallet'],
+    comments: 'Lastbil 3/5. Shims 310x100mm: 3mm (32 stk), 5mm (32 stk), 10mm (32 stk) x2 leveranser. NFK1005-010 S-029 Shimplates.',
+    status: { 'Pictures Taken': 'yes', 'Open': 'no', 'Broken': 'no', 'Smashed': 'no', 'Deformed': 'no', 'Soaked/Wet': 'no', 'Rusty/Corroded': 'no' },
+    resultat: 'OK',
+    signert: 'Patrik Gustavsson',
+    lagretDato: '12.01.2026',
+  },
+  'ID 43': {
+    reportnr: '43',
+    dato: '2026-03-05',
+    receiver: 'Patrik Gustavsson',
+    project: 'NKF-1005 Skyberg',
+    customer: 'Statnett',
+    supplier: 'Møre Trafo AS',
+    origin: 'Norge',
+    packref: 'Følgeseddel-03, Leveringsnummer 207933',
+    weight: '1840',
+    pakking: ['Other'],
+    comments: 'Wood beams. Stasjonstrafo / Oljetransformator. Ordr.nr 0000083314, Partinummer 2600010. NFK1005-002-022.',
+    status: { 'Pictures Taken': 'yes', 'Open': 'no', 'Broken': 'no', 'Smashed': 'no', 'Deformed': 'no', 'Soaked/Wet': 'no', 'Rusty/Corroded': 'no' },
+    resultat: 'OK',
+    signert: 'Patrik Gustavsson',
+    lagretDato: '05.03.2026',
+  },
+
+  'ID 40': {
+    reportnr: '40',
+    dato: '2026-02-17',
+    receiver: 'Patrik Gustavsson',
+    project: 'NKF-1005 Skyberg',
+    customer: 'Statnett',
+    ponr: '404937',
+    supplier: 'PLP SubCon GmbH (via EB Elektro)',
+    origin: 'Østerrike',
+    packref: 'Packlist L260098 (420kV B250322) + L260101 (132kV B250321)',
+    weight: '2885',
+    pakking: ['Pallet'],
+    comments: 'HV Clamps Bil 1. L260098: 420kV klemmer, 1399 kg, shipped 04/02/2026. L260101: 132kV klemmer, 1486 kg, shipped 05/02/2026. PLP SubCon, Dornbirn Austria.',
+    status: { 'Pictures Taken': 'yes', 'Open': 'no', 'Broken': 'no', 'Smashed': 'no', 'Deformed': 'no', 'Soaked/Wet': 'no', 'Rusty/Corroded': 'no' },
+    resultat: 'OK',
+    signert: 'Patrik Gustavsson',
+    lagretDato: '17.02.2026',
+  },
+};
+
+function applyRIRPrefill() {
+  const rir = getRIRState();
+  if (!rir.rapporter) rir.rapporter = {};
+  let changed = false;
+  Object.entries(RIR_PREFILL).forEach(([id, data]) => {
+    if (!rir.rapporter[id]) {
+      rir.rapporter[id] = data;
+      changed = true;
+    }
+  });
+  if (changed) {
+    state.__rir__ = rir;
+    save();
+  }
+}
+
+function getRIRState() {
+  if (!state.__rir__) state.__rir__ = { rapporter: {} };
+  return state.__rir__;
+}
+
+function formatDato(d) {
+  if (!d || d.length !== 8) return d;
+  return d.slice(6,8) + '.' + d.slice(4,6) + '.' + d.slice(0,4);
+}
+
+function showRIR() {
+  currentMC = '__rir__';
+  currentSheet = null;
+  buildSidebar();
+  renderRIR();
+}
+
+function renderRIR() {
+  const rir = getRIRState();
+  const nextId = (RIR_LOG.length + 1).toString().padStart(2,'0');
+
+  const logRows = RIR_LOG.map(r => {
+    const saved = rir.rapporter[r.id] || {};
+    const status = saved.resultat || '';
+    const statusColor = status === 'OK' ? '#2d7a4f' : status === 'Avvik' ? '#c0392b' : '#888';
+    return `<tr style="border-bottom:1px solid #f0f0f0;cursor:pointer" onclick="showRIRDetail('${r.id}')" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
+      <td style="padding:8px 10px;color:#888;font-size:12px;white-space:nowrap">${r.id}</td>
+      <td style="padding:8px 10px;font-size:13px;color:#1a2744">${r.beskrivelse}</td>
+      <td style="padding:8px 10px;font-size:12px;color:#555;white-space:nowrap">${formatDato(r.dato)}</td>
+      <td style="padding:8px 10px;text-align:center">
+        ${status ? `<span style="background:${statusColor};color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:600">${status}</span>` : '<span style="color:#ccc;font-size:11px">—</span>'}
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('main').innerHTML = `
+    <div style="padding:20px;max-width:900px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div>
+          <h1 style="font-size:20px;font-weight:700;color:#1a2744;margin:0 0 4px">📦 Mottakskontroll (RIR)</h1>
+          <div style="font-size:13px;color:#888">Reception Inspection Report — Skyberg · Statnett</div>
+        </div>
+        <button onclick="showRIRForm('ny')" style="background:#1a6b3a;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer">+ Ny RIR</button>
+      </div>
+
+      <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;margin-bottom:20px">
+        <div style="padding:12px 16px;background:#f9fafb;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px;font-weight:600;color:#1a2744">Logg — ${RIR_LOG.length} rapporter</span>
+          <span style="font-size:12px;color:#888">Klikk på en rad for detaljer</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#f5f7fa">
+                <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;font-weight:600;text-transform:uppercase">ID</th>
+                <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;font-weight:600;text-transform:uppercase">Beskrivelse</th>
+                <th style="padding:8px 10px;text-align:left;font-size:11px;color:#888;font-weight:600;text-transform:uppercase">Dato</th>
+                <th style="padding:8px 10px;text-align:center;font-size:11px;color:#888;font-weight:600;text-transform:uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody>${logRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+}
+
+function showRIRDetail(id) {
+  const entry = RIR_LOG.find(r => r.id === id);
+  if (!entry) return;
+  const rir = getRIRState();
+  const saved = rir.rapporter[id] || {};
+  showRIRForm(id, entry, saved);
+}
+
+function showRIRForm(id, entry, saved) {
+  const isNy = id === 'ny';
+  const rir = getRIRState();
+  saved = saved || {};
+
+  const pkgOpts = ['Pallet','Wood box','Metal/Plastic Container','Paper box','Other'].map(o =>
+    `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" ${(saved.pakking||[]).includes(o)?'checked':''} onchange="rirTogglePakking('${o}',this.checked)"> ${o}</label>`
+  ).join('');
+
+  const statusOpts = ['Pictures Taken','Open','Broken','Smashed','Deformed','Soaked/Wet','Rusty/Corroded','Water tight','Sealed'].map(o =>
+    `<tr>
+      <td style="padding:6px 8px;font-size:13px">${o}</td>
+      <td style="text-align:center"><input type="radio" name="rir_${o.replace(/\W/g,'_')}" value="yes" ${(saved.status||{})[o]==='yes'?'checked':''}></td>
+      <td style="text-align:center"><input type="radio" name="rir_${o.replace(/\W/g,'_')}" value="no" ${(saved.status||{})[o]==='no'?'checked':''}></td>
+    </tr>`
+  ).join('');
+
+  document.getElementById('main').innerHTML = `
+    <div style="padding:20px;max-width:800px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <button onclick="renderRIR()" style="background:#f0f2f5;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px">← Tilbake</button>
+        <h1 style="font-size:18px;font-weight:700;color:#1a2744;margin:0">${isNy ? 'Ny RIR' : 'RIR ID ' + id + ' — ' + (entry?.beskrivelse||'')}</h1>
+      </div>
+
+      <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:20px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div><label style="font-size:11px;color:#888;text-transform:uppercase;font-weight:600">Report Number</label>
+            <input id="rir_reportnr" class="ti" value="${saved.reportnr||''}" placeholder="Rapportnummer" style="width:100%;margin-top:4px"></div>
+          <div><label style="font-size:11px;color:#888;text-transform:uppercase;font-weight:600">Date</label>
+            <input id="rir_dato" class="ti" type="date" value="${saved.dato||''}" style="width:100%;margin-top:4px"></div>
+          <div><label style="font-size:11px;color:#888;text-transform:uppercase;font-weight:600">Receiver</label>
+            <input id="rir_receiver" class="ti" value="${saved.receiver||window.currentUser?.name||''}" placeholder="Mottaker" style="width:100%;margin-top:4px"></div>
+          <div><label style="font-size:11px;color:#888;text-transform:uppercase;font-weight:600">Project</label>
+            <input id="rir_project" class="ti" value="${saved.project||'NKF-1005 Skyberg'}" style="width:100%;margin-top:4px"></div>
+          <div><label style="font-size:11px;color:#888;text-transform:uppercase;font-weight:600">Customer</label>
+            <input id="rir_customer" class="ti" value="${saved.customer||'Statnett'}" style="width:100%;margin-top:4px"></div>
+          <div><label style="font-size:11px;color:#888;text-transform:uppercase;font-weight:600">PO Number</label>
+            <input id="rir_ponr" class="ti" value="${saved.ponr||''}" style="width:100%;margin-top:4px"></div>
+          <div><label style="font-size:11px;color:#888;text-transform:uppercase;font-weight:600">Supplier</label>
+            <input id="rir_supplier" class="ti" value="${saved.supplier||''}" style="width:100%;margin-top:4px"></div>
+          <div><label style="font-size:11px;color:#888;text-transform:uppercase;font-weight:600">Origin</label>
+            <input id="rir_origin" class="ti" value="${saved.origin||''}" style="width:100%;margin-top:4px"></div>
+          <div><label style="font-size:11px;color:#888;text-transform:uppercase;font-weight:600">Weight (kg)</label>
+            <input id="rir_weight" class="ti" value="${saved.weight||''}" style="width:100%;margin-top:4px"></div>
+          <div><label style="font-size:11px;color:#888;text-transform:uppercase;font-weight:600">Packing List Ref.</label>
+            <input id="rir_packref" class="ti" value="${saved.packref||''}" style="width:100%;margin-top:4px"></div>
+        </div>
+
+        <div style="margin-bottom:12px">
+          <label style="font-size:11px;color:#888;text-transform:uppercase;font-weight:600">Type of Packaging</label>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px" id="rir_pakking_container">${pkgOpts}</div>
+        </div>
+      </div>
+
+      <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:20px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;color:#1a2744;margin-bottom:12px;background:#1a6b3a;color:#fff;padding:8px 12px;border-radius:6px">Inspection Result — Package Status</div>
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th style="padding:6px 8px;text-align:left;font-size:12px;color:#888"></th>
+            <th style="padding:6px 8px;text-align:center;font-size:12px;color:#888">Yes</th>
+            <th style="padding:6px 8px;text-align:center;font-size:12px;color:#888">No</th>
+          </tr></thead>
+          <tbody id="rir_status_rows">${statusOpts}</tbody>
+        </table>
+      </div>
+
+      <div style="background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:20px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;color:#fff;background:#1a6b3a;padding:8px 12px;border-radius:6px;margin-bottom:12px">Comments</div>
+        <textarea id="rir_comments" style="width:100%;height:100px;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:13px;resize:vertical" placeholder="Kommentarer...">${saved.comments||''}</textarea>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <div style="margin-right:auto;display:flex;align-items:center;gap:8px">
+          <label style="font-size:12px;color:#888">Resultat:</label>
+          <select id="rir_resultat" style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+            <option value="" ${!saved.resultat?'selected':''}>— Ikke satt —</option>
+            <option value="OK" ${saved.resultat==='OK'?'selected':''}>✅ OK</option>
+            <option value="Avvik" ${saved.resultat==='Avvik'?'selected':''}>⚠️ Avvik</option>
+          </select>
+        </div>
+        <button onclick="renderRIR()" style="background:#f0f2f5;border:none;border-radius:8px;padding:10px 18px;font-size:13px;cursor:pointer">Avbryt</button>
+        <button onclick="saveRIR('${id}')" style="background:#1a6b3a;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer">Lagre</button>
+      </div>
+    </div>`;
+
+  // Store current pakking state for checkbox handler
+  window._rirPakking = [...(saved.pakking||[])];
+}
+
+function rirTogglePakking(option, checked) {
+  if (!window._rirPakking) window._rirPakking = [];
+  if (checked) { if (!window._rirPakking.includes(option)) window._rirPakking.push(option); }
+  else { window._rirPakking = window._rirPakking.filter(o => o !== option); }
+}
+
+function saveRIR(id) {
+  const rir = getRIRState();
+  if (!rir.rapporter) rir.rapporter = {};
+
+  // Collect status checkboxes
+  const statusFields = ['Pictures Taken','Open','Broken','Smashed','Deformed','Soaked/Wet','Rusty/Corroded','Water tight','Sealed'];
+  const statusObj = {};
+  statusFields.forEach(o => {
+    const name = 'rir_' + o.replace(/\W/g,'_');
+    const checked = document.querySelector(`input[name="${name}"]:checked`);
+    if (checked) statusObj[o] = checked.value;
+  });
+
+  rir.rapporter[id] = {
+    reportnr: document.getElementById('rir_reportnr')?.value || '',
+    dato: document.getElementById('rir_dato')?.value || '',
+    receiver: document.getElementById('rir_receiver')?.value || '',
+    project: document.getElementById('rir_project')?.value || '',
+    customer: document.getElementById('rir_customer')?.value || '',
+    ponr: document.getElementById('rir_ponr')?.value || '',
+    supplier: document.getElementById('rir_supplier')?.value || '',
+    origin: document.getElementById('rir_origin')?.value || '',
+    weight: document.getElementById('rir_weight')?.value || '',
+    packref: document.getElementById('rir_packref')?.value || '',
+    pakking: window._rirPakking || [],
+    status: statusObj,
+    comments: document.getElementById('rir_comments')?.value || '',
+    resultat: document.getElementById('rir_resultat')?.value || '',
+    signert: window.currentUser?.name || '',
+    lagretDato: new Date().toLocaleDateString('no-NO'),
+  };
+
+  state.__rir__ = rir;
+  save();
+  toast('RIR lagret!');
+  renderRIR();
+}
+
 function showChangelog(){
   currentMC='__changelog__';
   currentSheet=null;
   buildSidebar();
   
   const versions=[
+    {
+      ver:'1.5.0',
+      dato:'15.05.2026',
+      endringer:[
+        '"Sjekklister" (Felles) lagt øverst i sidemenyen',
+        '420 kV og 132 kV gruppert under "MC Sjekklister"',
+        'Bilde-opplasting via Cloudflare R2',
+        'Presence-system: se hvem som er i en sjekkliste',
+        'Timeout 5 min med automatisk utlogging',
+        'Bytt bruker-knapp i header',
+        'Klikbart avvikstall med avviksrapport',
+        'Navigér direkte til sjekkliste fra avviksrapporten',
+      ]
+    },
     {
       ver:'1.4.0',
       dato:'12.05.2026',
@@ -1303,6 +1803,7 @@ const USERS = [
   { id:'patrik',  name:'Patrik Gustavsson',  initials:'PG' },
   { id:'miguel',  name:'Miguel Pires',       initials:'MP' },
   { id:'hampus',  name:'Hampus',             initials:'H'  },
+  { id:'test',    name:'Test',               initials:'T'  },
 ];
 
 let loginState = { user:null, pin:'', step:'grid', confirmPin:'' };
@@ -1468,6 +1969,7 @@ function processPin() {
 // ── INIT ──
 initLogin();
 loadCloud().then(()=>{
+  applyRIRPrefill();
   buildSidebar();
   showHome();
 });

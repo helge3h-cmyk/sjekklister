@@ -263,7 +263,7 @@ table.ct tr.r-na .av-btns{pointer-events:none;opacity:.4}
   <div class="user-grid" id="user-grid"></div>
 </div>
 
-<div id="pin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:none;align-items:center;justify-content:center">
+<div id="pin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;align-items:center;justify-content:center">
   <div class="pin-screen">
     <div class="login-user-badge" id="pin-user-badge">
       <div class="avatar-sm" id="pin-avatar"></div>
@@ -1796,9 +1796,11 @@ async function uploadImages(input, mcid, sn) {
     }
     // Compress image before upload
     const compressed = await compressImage(file, 1200, 0.8);
-    const key = mcid + '/' + sn + '/' + Date.now() + '-' + file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const safeSheet = encodeURIComponent(sn);
+    const safeFile = Date.now() + '-' + file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const key = mcid + '/' + sn + '/' + safeFile;
     try {
-      await fetch(WORKER + '/images/' + encodeURIComponent(key), {
+      await fetch(WORKER + '/images/' + mcid + '/' + safeSheet + '/' + safeFile, {
         method: 'PUT',
         headers: { 'Content-Type': file.type || 'image/jpeg' },
         body: compressed

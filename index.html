@@ -2054,6 +2054,14 @@ function getVedlegg(id, filename) {
   }
   return null;
 }
+
+// ── INIT ──
+initLogin();
+loadCloud().then(()=>{
+  applyRIRPrefill();
+  buildSidebar();
+  showHome();
+});
 </script>
 </body>
 </html>
